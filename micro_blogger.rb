@@ -16,11 +16,13 @@ class MicroBlogger
     until command == "q"
       printf "Enter command: "
       input = gets.chomp!
-      command = input.split[0].downcase
-      message = input.split[1..-1].join(" ")
+      parts = input.split
+      command = parts[0].downcase
       case command
       when "q" then puts "Goodbye!"
-      when "t" then tweet(message)
+      when "t" then tweet(parts[1..-1].join(" "))
+      when "dm" then dm(parts[1], parts[2..-1].join(" "))
+      when "spam" then spam_my_followers(parts[1..-1].join(" "))
       else
         puts "Sorry, I don't know how to #{command}."
       end
@@ -32,7 +34,32 @@ class MicroBlogger
       @client.update(message)
       puts "Tweet posted.\n#{message}"
     else
-      puts "Tweet was not posted (exceeds 140 characters)."
+      puts "Tweet not posted (exceeds 140 characters)."
+    end
+  end
+
+  def dm(target, message)
+    puts "Trying to send #{target} this direct message:"
+    puts message
+    if followers_list.include?(target)
+      message = "d @#{target} #{message}"
+      tweet(message)
+    else
+      puts "Message not sent (target is not a follower)."
+    end
+  end
+
+  def spam_my_followers(message)
+    followers_list.each do |follower|
+      dm(follower, message)
+    end
+  end
+
+  private
+
+  def followers_list
+    @client.followers.map do |follower|
+      @client.user(follower).screen_name
     end
   end
 end
