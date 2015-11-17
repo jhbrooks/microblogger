@@ -1,6 +1,7 @@
 #!/Users/jhbrooks/.rvm/rubies/ruby-2.2.0/bin/ruby
 
 require "jumpstart_auth"
+require "bitly"
 
 class MicroBlogger
   attr_reader :client
@@ -8,6 +9,8 @@ class MicroBlogger
   def initialize
     puts "Intitializing..."
     @client = JumpstartAuth.twitter
+    Bitly.use_api_version_3
+    @bitly = Bitly.new("hungryacademy", "R_430e9f62250186d2612cca76eee2dbc6")
   end
 
   def run
@@ -16,7 +19,14 @@ class MicroBlogger
     until command == "q"
       printf "Enter command: "
       input = gets.chomp!
-      parts = input.split
+      parts = input.split.map do |potential_url|
+        if potential_url.match(%r{http:\/\/\S+\.com})
+          url = potential_url.scan(%r{http:\/\/\S+\.com}).first
+          potential_url.sub(%r{http:\/\/\S+\.com}, shorten(url))
+        else
+          potential_url
+        end
+      end
       command = parts[0].downcase
       case command
       when "q" then puts "Goodbye!"
@@ -24,11 +34,14 @@ class MicroBlogger
       when "dm" then dm(parts[1], parts[2..-1].join(" "))
       when "spam" then spam_my_followers(parts[1..-1].join(" "))
       when "elt" then everyones_last_tweet
+      when "s" then shorten(parts[1..-1].join(" "))
       else
         puts "Sorry, I don't know how to #{command}."
       end
     end
   end
+
+  private
 
   def tweet(message)
     if message.length <= 140
@@ -72,7 +85,12 @@ class MicroBlogger
     end
   end
 
-  private
+  def shorten(original_url)
+    shortened_url = @bitly.shorten(original_url).short_url
+    puts "Shortening #{original_url}..."
+    puts "...shortened to #{shortened_url}"
+    shortened_url
+  end
 
   def followers_list
     @client.followers.map do |follower|
