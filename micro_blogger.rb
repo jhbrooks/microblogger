@@ -3,6 +3,7 @@
 require "jumpstart_auth"
 require "bitly"
 
+# This class operates a command line Twitter client
 class MicroBlogger
   attr_reader :client
 
@@ -17,31 +18,43 @@ class MicroBlogger
     puts "Welcome to the JSL Twitter Client!"
     command = ""
     until command == "q"
-      printf "Enter command: "
+      print "Enter command: "
       input = gets.chomp!
-      parts = input.split.map do |potential_url|
-        if potential_url.match(%r{http:\/\/\S+\.com})
-          url = potential_url.scan(%r{http:\/\/\S+\.com}).first
-          potential_url.sub(%r{http:\/\/\S+\.com}, shorten(url))
-        else
-          potential_url
-        end
-      end
+      parts = input.split
       command = parts[0].downcase
-      case command
-      when "q" then puts "Goodbye!"
-      when "t" then tweet(parts[1..-1].join(" "))
-      when "dm" then dm(parts[1], parts[2..-1].join(" "))
-      when "spam" then spam_my_followers(parts[1..-1].join(" "))
-      when "elt" then everyones_last_tweet
-      when "s" then shorten(parts[1..-1].join(" "))
-      else
-        puts "Sorry, I don't know how to #{command}."
-      end
+      remainder = parts[1..-1]
+      handle_command(command, remainder)
     end
   end
 
   private
+
+  def handle_command(command, remainder)
+    case command
+    when "q" then puts "Goodbye!"
+    when "t" then tweet(remainder.join(" "))
+    when "st" then tweet(shorten_urls(remainder).join(" "))
+    when "dm" then dm(remainder[0], remainder[1..-1].join(" "))
+    when "sdm" then dm(remainder[0], shorten_urls(remainder[1..-1]).join(" "))
+    when "spam" then spam_my_followers(remainder.join(" "))
+    when "sspam" then spam_my_followers(shorten_urls(remainder).join(" "))
+    when "elt" then everyones_last_tweet
+    when "s" then shorten(remainder.join(" "))
+    else
+      puts "Sorry, I don't know how to #{command}."
+    end
+  end
+
+  def shorten_urls(potential_urls)
+    potential_urls.map do |potential_url|
+      if potential_url.match(%r{http:\/\/\S+\.com})
+        url = potential_url.scan(%r{http:\/\/\S+\.com}).first
+        potential_url.sub(%r{http:\/\/\S+\.com}, shorten(url))
+      else
+        potential_url
+      end
+    end
+  end
 
   def tweet(message)
     if message.length <= 140
@@ -86,10 +99,16 @@ class MicroBlogger
   end
 
   def shorten(original_url)
-    shortened_url = @bitly.shorten(original_url).short_url
-    puts "Shortening #{original_url}..."
-    puts "...shortened to #{shortened_url}"
-    shortened_url
+    begin
+      shortened_url = @bitly.shorten(original_url).short_url
+      puts "Shortening #{original_url}..."
+      puts "...shortened to #{shortened_url}"
+      shortened_url
+    rescue BitlyError
+      puts "Shortening #{original_url}..."
+      puts "...shortening failed (invalid URL for Bitly)."
+      original_url
+    end
   end
 
   def followers_list
